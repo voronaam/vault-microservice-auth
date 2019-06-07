@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/subtle"
+//	"crypto/subtle"
+    "net/http"
+    "io/ioutil"
 	"errors"
 	"log"
 	"os"
@@ -70,21 +72,32 @@ func Backend(c *logical.BackendConfig) *backend {
 }
 
 func (b *backend) pathAuthLogin(_ context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	password := d.Get("password").(string)
+	// password := d.Get("password").(string)
 
+    /* Ignore passwords for now
 	if subtle.ConstantTimeCompare([]byte(password), []byte("super-secret-password")) != 1 {
 		return nil, logical.ErrPermissionDenied
+	}
+	*/
+	resp, err := http.Get("http://localhost:8000/auth/trytoguessme")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
 	// Compose the response
 	return &logical.Response{
 		Auth: &logical.Auth{
 			InternalData: map[string]interface{}{
-				"secret_value": "abcd1234",
+				"secret_value": body,
 			},
 			Policies: []string{"my-policy", "other-policy"},
 			Metadata: map[string]string{
-				"fruit": "banana",
+				"fruit": string(body),
 			},
 			LeaseOptions: logical.LeaseOptions{
 				TTL:       30 * time.Second,
