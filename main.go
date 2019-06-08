@@ -16,6 +16,13 @@ import (
 	"github.com/hashicorp/vault/sdk/plugin"
 )
 
+type Token struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int64  `json:"expires_in"`
+	Scope       string `json:"scope"`
+	TokenType   string `json:"token_type"`
+}
+
 func main() {
 	apiClientMeta := &api.PluginAPIClientMeta{}
 	flags := apiClientMeta.FlagSet()
@@ -71,6 +78,8 @@ func Backend(c *logical.BackendConfig) *backend {
 	return &b
 }
 
+
+
 func (b *backend) pathAuthLogin(_ context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	// password := d.Get("password").(string)
 
@@ -79,7 +88,12 @@ func (b *backend) pathAuthLogin(_ context.Context, req *logical.Request, d *fram
 		return nil, logical.ErrPermissionDenied
 	}
 	*/
-	resp, err := http.Get("http://localhost:8000/auth/trytoguessme")
+	resp, err := http.PostForm("http://localhost:8000/token", url.Values{
+	    "grant_type": {"client_credentials"},
+	    "client_id":{"foo"},
+	    "client_secret":{"bar"},
+	    "scope":{"read"}
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +103,21 @@ func (b *backend) pathAuthLogin(_ context.Context, req *logical.Request, d *fram
 		return nil, err
 	}
 
+	var token = new(Token)
+	err = json.Unmarshal(body, &token)
+	if err != nil {
+		return nil, err
+	}
+
 	// Compose the response
 	return &logical.Response{
 		Auth: &logical.Auth{
 			InternalData: map[string]interface{}{
-				"secret_value": body,
+				"secret_value": token.AccessToken,
 			},
 			Policies: []string{"my-policy", "other-policy"},
 			Metadata: map[string]string{
-				"fruit": string(body),
+				"fruit": string(token.AccessToken),
 			},
 			LeaseOptions: logical.LeaseOptions{
 				TTL:       30 * time.Second,
